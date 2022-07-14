@@ -10,7 +10,7 @@ The implementation of the paper
 
 ## Requirements
 ```
-Python >= 3.6, PyTorch == 1.3.0, torchvision >= 0.2
+Python >= 3.7, PyTorch == 1.8.2, torchvision >= 0.9
 ```
 
 **RelativeNAS** is based on continuous encoding in cell-based search space. 

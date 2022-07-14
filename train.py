@@ -101,16 +101,16 @@ def main():
         valid_data = dset.CIFAR10(root=args.data, train=False, download=False, transform=valid_transform)
 
     train_queue = torch.utils.data.DataLoader(
-        train_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=2)
+        train_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=0)
 
     valid_queue = torch.utils.data.DataLoader(
-        valid_data, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=2)
+        valid_data, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=0)
 
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.epochs))
 
     best_acc = 0.0
     for epoch in range(args.epochs):
-        logging.info('epoch %d lr %e', epoch, scheduler.get_lr()[0])
+        logging.info('epoch %d lr %e', epoch, scheduler.get_last_lr()[0])
         # model.drop_path_prob = args.drop_path_prob * epoch / args.epochs
         model.module.drop_path_prob = args.drop_path_prob * epoch / args.epochs
 
@@ -163,22 +163,22 @@ def infer(valid_queue, model, criterion):
     top1 = utils.AvgrageMeter()
     top5 = utils.AvgrageMeter()
     model.eval()
+    with torch.no_grad():
+        for step, (input, target) in enumerate(valid_queue):
+            input = input.cuda(non_blocking=True)
+            target = target.cuda(non_blocking=True)
 
-    for step, (input, target) in enumerate(valid_queue):
-        input = input.cuda(non_blocking=True)
-        target = target.cuda(non_blocking=True)
+            logits, _ = model(input)
+            loss = criterion(logits, target)
 
-        logits, _ = model(input)
-        loss = criterion(logits, target)
+            prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
+            n = input.size(0)
+            objs.update(loss.item(), n)
+            top1.update(prec1.item(), n)
+            top5.update(prec5.item(), n)
 
-        prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
-        n = input.size(0)
-        objs.update(loss.item(), n)
-        top1.update(prec1.item(), n)
-        top5.update(prec5.item(), n)
-
-        # if step % args.report_freq == 0:
-        #     logging.info('valid %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
+            # if step % args.report_freq == 0:
+            #     logging.info('valid %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
 
     return top1.avg, objs.avg
 
